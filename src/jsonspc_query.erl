@@ -35,13 +35,17 @@ start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 read(Server, Expression, ReplyTo) ->
-    gen_server:cast(Server, {read, Expression, ReplyTo}).
+    Ref = make_ref(),
+    gen_server:cast(Server, {read, Expression, ReplyTo, Ref}),
+    Ref.
 
 write(Server, Value) ->
     gen_server:cast(Server, {write, Value}).
 
 take(Server, Expression, ReplyTo) ->
-    gen_server:cast(Server, {take, Expression, ReplyTo}).
+    Ref = make_ref(),
+    gen_server:cast(Server, {take, Expression, ReplyTo, Ref}),
+    Ref.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -93,26 +97,26 @@ handle_call(_Request, _From, State) ->
 
 
 %% Read a value without removing it.
-handle_cast(Q = {read, Expression, ReplyTo},
+handle_cast(Q = {read, Expression, ReplyTo, Ref},
             State = #state{ outstanding = Queries }) ->
     case read_value(Expression, State) of
         none ->
             AddedQuery = queue:in(Q, Queries),
             {noreply, State#state{ outstanding = AddedQuery }};
         {Bindings, NewState} ->
-            ReplyTo ! {result, Bindings},
+            ReplyTo ! {result, Bindings, Ref},
             {noreply, NewState}
     end;
 
 %% Read a value and remove it.
-handle_cast(Q = {take, Expression, ReplyTo},
+handle_cast(Q = {take, Expression, ReplyTo, Ref},
             State = #state{ outstanding = Queries }) ->
     case take_value(Expression, State) of
         none ->
             AddedQuery = queue:in(Q, Queries),
             {noreply, State#state{ outstanding = AddedQuery }};
         {Bindings, NewState} ->
-            ReplyTo ! {result, Bindings},
+            ReplyTo ! {result, Bindings, Ref},
             {noreply, NewState}
     end;
 
@@ -227,20 +231,20 @@ try_outstanding1(Value, ToTry, Tried) ->
             {read, Tried};
         {{value, Query}, Rest} ->
             case Query of
-                Q = {read, Expression, ReplyTo} ->
+                Q = {read, Expression, ReplyTo, Ref} ->
                     case rejson:match(Expression, Value) of
                         no_match ->
                             try_outstanding1(Value, Rest, queue:in(Q, Tried));
                         {ok, Bindings} ->
-                            ReplyTo ! {result, Bindings},
+                            ReplyTo ! {result, Bindings, Ref},
                             try_outstanding1(Value, Rest, Tried)
                     end;
-                Q = {take, Expression, ReplyTo} ->
+                Q = {take, Expression, ReplyTo, Ref} ->
                     case rejson:match(Expression, Value) of
                         no_match ->
                             try_outstanding1(Value, Rest, queue:in(Q, Tried));
                         {ok, Bindings} ->
-                            ReplyTo ! {result, Bindings},
+                            ReplyTo ! {result, Bindings, Ref},
                             {taken, queue:join(Tried, Rest)}
                     end
             end

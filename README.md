@@ -5,17 +5,17 @@
     $ erl -pa deps/rejson/ebin ebin
 
     1> {ok, S} = jsonspc_query:start_link().
-    {ok,<0.33.0>}
-    2> {ok, E} = rejson:parse("[1, 2, foo = number]").
-    {ok,[1,2,{capture,"foo",number}]}
-    3> jsonspc_query:read(S, E, self()).
-    ok
-    4> f(R), receive R -> R after 100 -> no end.
+    {ok, <0.33.0>}
+    2> {ok, E} = rejson:parse("foo = [1, 2, number *]").
+    {ok,{capture,"foo",[1,2,{star,number}]}}
+    3> f(Ref), Ref = jsonspc_query:read(S, E, self()).
+    #Ref<0.0.0.35>
+    4> f(R), receive {result, R, Ref} -> R after 100 -> no end.
     no
-    5> jsonspc_query:write(S, [1, 2, 3]).
+    5> jsonspc_query:write(S, [1, 2, 3, 4]).
     ok
-    6> f(R), receive R -> R after 100 -> no end.
-    {result,[{"foo",3}]}
+    6> f(R), receive {result, R, Ref} -> R after 100 -> no end.
+    [{"foo",[1,2,3,4]}]
 
 ## What?
 
@@ -25,9 +25,9 @@ here](https://github.com/squaremo/rejson#readme)).
 
 There are three operations:
 
- * `write(Server, Value)`
- * `read(Server, Expression)`
- * `take(Server, Expression)`
+ * `write(Value)`
+ * `read(Expression)`
+ * `take(Expression)`
 
 `read` and `take` return the result of successfully matching the given
 expression with a value from those values that have been, or will be,
