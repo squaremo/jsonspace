@@ -10,7 +10,9 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    jsonspc_sup:start_link().
+    SupOk = jsonspc_sup:start_link(),
+    jsonspc_web:start(),
+    SupOk.
 
 stop(_State) ->
     ok.
