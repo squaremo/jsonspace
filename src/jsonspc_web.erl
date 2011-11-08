@@ -6,9 +6,9 @@ dispatcher() ->
     [{jsonspace, fun incoming/2}].
 
 incoming(Conn, {recv, Data}) ->
-    case binary_to_list(Data) of
-        "read " ++ PatternString ->
-            case rejson:parse(PatternString) of
+    case Data of
+        <<"read ", PatternString/binary>> ->
+            case rejson:parse(binary_to_list(PatternString)) of
                 {ok, Pattern} ->
                     spawn(fun() ->
                                   Ref = jsonspc_query:read(jsonspc_query, Pattern, self()),
@@ -20,8 +20,8 @@ incoming(Conn, {recv, Data}) ->
                 _Else ->
                     Conn:close(3000, "Malformed reJSON pattern")
             end;
-        "take " ++ PatternString ->
-            case rejson:parse(PatternString) of
+        <<"take ", PatternString/binary>> ->
+            case rejson:parse(binary_to_list(PatternString)) of
                 {ok, Pattern} ->
                     spawn(fun() ->
                                   Ref = jsonspc_query:take(jsonspc_query, Pattern, self()),
@@ -33,12 +33,12 @@ incoming(Conn, {recv, Data}) ->
                 _Else ->
                     Conn:close(3000, "Malformed reJSON pattern")
             end;
-        "write " ++ ValueString ->
-            case json:decode(ValueString) of
-                {ok, Value} ->
-                    jsonspc_query:write(jsonspc_query, Value);
-                _Else ->
-                    Conn:close(3000, "Malformed JSON value")
+        <<"write ", ValueString/binary>> ->
+            case catch unjsonify(ValueString) of
+                {error, _} ->
+                    Conn:close(3000, "Malformed JSON value");
+                Value ->
+                    jsonspc_query:write(jsonspc_query, Value)
             end;
         _Else ->
             Conn:close(3000, "Invalid operation")
@@ -58,6 +58,8 @@ handle(Req) ->
     case Path0 of
         "/jsonspace.js" ->
             serve_file(Req1, "jsonspace.js");
+        "/" ++ Path when Path =:= "index.html" orelse Path =:= "" ->
+            serve_file(Req1, "index.html");
         "/" ++ Path ->
             case sockjs_filters:handle_req(Req1, Path, dispatcher()) of
                 nomatch ->
@@ -83,7 +85,9 @@ serve_file(Req, Filename) ->
             sockjs_http:reply(404, [], "Not found", Req)
     end.
 
+unjsonify(Bin) ->
+    jiffy:decode(Bin).
+
 jsonify(Bindings) ->
-    {ok, Bin} =
-        json:encode({[{list_to_binary(Var), Value} || {Var, Value} <- Bindings]}),
-    Bin.
+    jiffy:encode(
+      {[{list_to_binary(Var), Value} || {Var, Value} <- Bindings]}).
