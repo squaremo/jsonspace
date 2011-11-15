@@ -57,9 +57,9 @@ handle(Req) ->
     {Path0, Req1} = sockjs_http:path(Req),
     case Path0 of
         "/jsonspace.js" ->
-            serve_file(Req1, "jsonspace.js");
+            serve_file(Req1, "jsonspace.js", "text/javascript");
         "/" ++ Path when Path =:= "index.html" orelse Path =:= "" ->
-            serve_file(Req1, "index.html");
+            serve_file(Req1, "index.html", "text/html");
         "/" ++ Path ->
             case sockjs_filters:handle_req(Req1, Path, dispatcher()) of
                 nomatch ->
@@ -74,13 +74,14 @@ ws_handle(Req) ->
     {Receive, _, _, _} = sockjs_filters:dispatch('GET', Path, dispatcher()),
     {Receive, Req1}.
 
-serve_file(Req, Filename) ->
+serve_file(Req, Filename, ContentType) ->
     {file, ModFile} = code:is_loaded(?MODULE),
     Path = filename:join([filename:dirname(filename:dirname(ModFile)),
                           "priv", "www", Filename]),
     case file:read_file(Path) of
         {ok, Bytes} ->
-            sockjs_http:reply(200, [], Bytes, Req);
+            sockjs_http:reply(200, [{"Content-Type", ContentType}],
+                              Bytes, Req);
         {error, _} ->
             sockjs_http:reply(404, [], "Not found", Req)
     end.
