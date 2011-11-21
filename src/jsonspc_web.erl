@@ -87,8 +87,16 @@ serve_file(Req, Filename, ContentType) ->
     end.
 
 unjsonify(Bin) ->
-    jiffy:decode(Bin).
+    keys_to(fun binary_to_list/1, jiffy:decode(Bin)).
 
 jsonify(Bindings) ->
     jiffy:encode(
-      {[{list_to_binary(Var), Value} || {Var, Value} <- Bindings]}).
+      {[{list_to_binary(Var), keys_to(fun list_to_binary/1, Value)} ||
+            {Var, Value} <- Bindings]}).
+
+keys_to(Fun, {Pairs}) when is_list(Pairs) ->
+    {[{Fun(K), keys_to(Fun, V)} || {K, V} <- Pairs]};
+keys_to(Fun, Array) when is_list(Array) ->
+    [keys_to(Fun, V) || V <- Array];
+keys_to(_Fun, Else) ->
+    Else.
