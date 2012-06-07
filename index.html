@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>
+      JSONspace
+    </title>
+    <script src="http://cdn.sockjs.org/sockjs-0.3.min.js">
+    </script>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js">
+    </script>
+    <script type="text/javascript">
+      var sock = new SockJS('http://localhost:5000/query');
+      sock.onmessage = function(msg) {
+        $('#results').append($('<p/>').text(msg.data));
+      };
+
+      $(function() {
+        $('#take').click(function() {
+          sock.send('TAKE ' + $('#query').val());
+        });
+      
+        $('#read').click(function() {
+          sock.send('READ ' + $('#query').val());
+        });
+
+        $('#write').bind('click', function() {
+          console.log('write');
+          sock.send('WRITE ' + $('#value').val());
+        });
+      });
+
+    </script>
+  </head>
+  <body>
+    <h1>Try it out.</h1>
+    <p>
+      <input id="query" placeholder="query e.g., [number*]"/>
+      <button id="read">Read a value</button>
+      <button id="take">Take a value</button>
+    </p>
+    <p>
+      <textarea id="value">[1, 2, 3]</textarea>
+      <button id="write">Write a value</button>
+    <h3>Results</h3>
+    <div id="results"/>
+  </body>
+</html>
